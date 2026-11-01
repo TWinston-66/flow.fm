@@ -11,8 +11,11 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
   against `RadioPlayer.swift` to exercise playback logic.
 
 ## Code layout
-- `flow.fm/RadioPlayer.swift` — `@Observable` model wrapping `AVPlayer`; plays the stream, polls now-playing,
+- `flow.fm/RadioPlayer.swift` — `@Observable` model wrapping `AVPlayer`; resolves mirrors from
+  `defcon130.pls` (falls back to ice2/ice5/ice6), fails over with a 10 s connect timeout and on mid-stream
+  drops, polls now-playing, owns the app-only `volume` (`AVPlayer.volume`, persisted in UserDefaults), and
   handles audio session interruptions (iOS 27 `didBecomeInactive` / `resumptionRecommendation` notifications).
+  `init(mirrors:)` lets you inject URLs (e.g. an unroutable `https://10.255.255.1/...` to simulate a hang).
 - `flow.fm/NowPlayingCenter.swift` — Lock Screen / Control Center / media keys via `MPNowPlayingInfoCenter`
   and `MPRemoteCommandCenter`. Artwork handler is `nonisolated` because the system calls it off-main.
 - `flow.fm/MyApp.swift` — owns the single `RadioPlayer` (so remote commands register once) and injects it
@@ -43,7 +46,9 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
   first metadata block and then only on song change. Now playing therefore polls
   `songs/defcon.json` every 30 s while playing.
 - One mirror once accepted the connection but sent no headers for >5 s; another responded
-  immediately. Plan for mirror fallback and generous timeouts.
+  immediately. Hence mirror failover.
+- **A hung `AVPlayerItem` blocks the same `AVPlayer` from loading the next item** (verified: next
+  mirror never became ready even after 30 s). Call `item.asset.cancelLoading()` before moving on.
 - Live stream: on play, create a fresh `AVPlayerItem` so playback starts at the live edge.
 
 ## SomaFM etiquette
@@ -54,8 +59,8 @@ to link to their donate page (https://somafm.com/support/).
 Done:
 - Minimal player (play/stop, logo, now playing).
 - Background audio, Lock Screen / Control Center / media keys, interruption handling.
+- Mirror failover via `.pls`; app-only volume slider.
 
 Next candidates:
-1. Resolve `.pls` and fail over between mirrors.
-2. Quality picker (AAC 128/64/32, MP3 256/128).
-3. Song history list from `songs/defcon.json`.
+1. Quality picker (AAC 128/64/32, MP3 256/128).
+2. Song history list from `songs/defcon.json`.

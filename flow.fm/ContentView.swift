@@ -4,6 +4,8 @@ struct ContentView: View {
     @Environment(RadioPlayer.self) private var radio
 
     var body: some View {
+        @Bindable var radio = radio
+
         VStack(spacing: 24) {
             AsyncImage(url: RadioPlayer.logoURL) { image in
                 image.resizable().scaledToFit()
@@ -23,8 +25,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(radio.nowPlaying ?? (radio.isPlaying ? "Connecting…" : " "))
+            Text(radio.errorMessage ?? radio.nowPlaying ?? (radio.isPlaying ? "Connecting…" : " "))
                 .font(.headline)
+                .foregroundStyle(radio.errorMessage == nil ? .primary : Color.red)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(minHeight: 44)
@@ -39,6 +42,16 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.circle)
             .accessibilityLabel(radio.isPlaying ? "Stop" : "Play")
+
+            // Controls only this app's volume; the system output volume is untouched.
+            HStack(spacing: 12) {
+                Image(systemName: "speaker.fill")
+                Slider(value: $radio.volume, in: 0...1)
+                    .accessibilityLabel("Volume")
+                Image(systemName: "speaker.wave.3.fill")
+            }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: 280)
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
