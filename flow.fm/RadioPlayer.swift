@@ -5,12 +5,6 @@ import Observation
 /// Plays the SomaFM DEF CON Radio Icecast stream and publishes the current track title.
 @Observable
 final class RadioPlayer {
-    /// 128k AAC playlist; lists several Icecast mirrors for the same stream.
-    static let playlistURL = URL(string: "https://somafm.com/defcon130.pls")!
-    /// Used when the playlist itself can't be fetched.
-    static let fallbackMirrors = ["ice2", "ice5", "ice6"].map {
-        URL(string: "https://\($0).somafm.com/defcon-128-aac")!
-    }
     /// Recent-tracks feed; the first entry is the song currently on air.
     static let songsURL = URL(string: "https://somafm.com/songs/defcon.json")!
     static let logoURL = URL(string: "https://api.somafm.com/logos/512/defcon512.png")!
@@ -18,10 +12,25 @@ final class RadioPlayer {
     /// How long a mirror gets to start producing audio before we try the next one.
     private static let connectTimeout: Duration = .seconds(10)
     private static let volumeKey = "volume"
+    private static let qualityKey = "quality"
 
     private(set) var isPlaying = false
-    private(set) var track: Track?
+    /// Most recent first, as reported by SomaFM. The first entry is on air now.
+    private(set) var recentTracks: [Track] = []
     private(set) var errorMessage: String?
+
+    var track: Track? { recentTracks.first }
+
+    /// Stream format. Persisted; changing it while playing reconnects at the new quality.
+    var quality: StreamQuality = UserDefaults.standard.string(forKey: RadioPlayer.qualityKey)
+        .flatMap(StreamQuality.init(rawValue:)) ?? .aac128 {
+        didSet {
+            guard quality != oldValue else { return }
+            UserDefaults.standard.set(quality.rawValue, forKey: Self.qualityKey)
+            mirrors = mirrorOverride
+            if isPlaying { play() }
+        }
+    }
 
     /// App-only volume (0...1), independent of the system output volume. Persisted across launches.
     var volume: Float = UserDefaults.standard.object(forKey: RadioPlayer.volumeKey) as? Float ?? 1 {
@@ -37,7 +46,9 @@ final class RadioPlayer {
 
     @ObservationIgnored private let player = AVPlayer()
     @ObservationIgnored private let nowPlayingCenter = NowPlayingCenter()
+    /// Mirrors for the current quality; empty until resolved from the playlist.
     @ObservationIgnored private var mirrors: [URL]
+    @ObservationIgnored private let mirrorOverride: [URL]
     @ObservationIgnored private var artwork: MPMediaItemArtwork?
     @ObservationIgnored private var streamTask: Task<Void, Never>?
     @ObservationIgnored private var nowPlayingTask: Task<Void, Never>?
@@ -45,9 +56,10 @@ final class RadioPlayer {
     /// True when the system, not the user, stopped playback (phone call, Siri, another app).
     @ObservationIgnored private var wasInterrupted = false
 
-    /// - Parameter mirrors: Stream URLs to use instead of resolving `playlistURL` (empty = resolve on first play).
+    /// - Parameter mirrors: Stream URLs to use instead of resolving the quality's playlist (empty = resolve on play).
     init(mirrors: [URL] = []) {
         self.mirrors = mirrors
+        self.mirrorOverride = mirrors
         player.volume = volume
         nowPlayingCenter.configureCommands(
             play: { [weak self] in self?.play() },
@@ -101,7 +113,7 @@ final class RadioPlayer {
     /// fresh `AVPlayerItem` at the live edge.
     private func runStream() async {
         if mirrors.isEmpty {
-            mirrors = await Self.resolveMirrors()
+            mirrors = await Self.resolveMirrors(for: quality)
         }
 
         var index = 0
@@ -160,11 +172,11 @@ final class RadioPlayer {
     }
 
     /// Fetches the `.pls` playlist for the current mirror list, falling back to known mirrors.
-    private static func resolveMirrors() async -> [URL] {
-        guard let (data, _) = try? await URLSession.shared.data(from: playlistURL),
-              let text = String(data: data, encoding: .utf8) else { return fallbackMirrors }
+    private static func resolveMirrors(for quality: StreamQuality) async -> [URL] {
+        guard let (data, _) = try? await URLSession.shared.data(from: quality.playlistURL),
+              let text = String(data: data, encoding: .utf8) else { return quality.fallbackMirrors }
         let urls = parsePlaylist(text)
-        return urls.isEmpty ? fallbackMirrors : urls
+        return urls.isEmpty ? quality.fallbackMirrors : urls
     }
 
     /// Extracts stream URLs from `FileN=` lines of a PLS playlist, in order.
@@ -225,17 +237,22 @@ final class RadioPlayer {
     /// 30 seconds keeps the title reasonably fresh without hammering a listener-supported service.
     private func pollNowPlaying() async {
         while !Task.isCancelled {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: Self.songsURL)
-                if let latest = try JSONDecoder().decode(SongHistory.self, from: data).songs.first,
-                   latest != track {
-                    track = latest
-                    publishNowPlaying()
-                }
-            } catch {
-                print("Now playing fetch failed: \(error)")
-            }
+            await refreshTracks()
             try? await Task.sleep(for: .seconds(30))
+        }
+    }
+
+    /// Fetches the recent-tracks feed once. Also called when the UI appears, so history shows before playing.
+    func refreshTracks() async {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: Self.songsURL)
+            let tracks = try JSONDecoder().decode(SongHistory.self, from: data).songs
+            guard tracks != recentTracks else { return }
+            let currentChanged = tracks.first != track
+            recentTracks = tracks
+            if currentChanged { publishNowPlaying() }
+        } catch {
+            print("Recent tracks fetch failed: \(error)")
         }
     }
 
@@ -247,9 +264,28 @@ final class RadioPlayer {
     }
 }
 
-struct Track: Decodable, Equatable {
+struct Track: Decodable, Equatable, Identifiable {
     let title: String
     let artist: String
+    let album: String
+    let playedAt: Date
+
+    /// Start time plus title is unique within the feed.
+    var id: String { "\(playedAt.timeIntervalSince1970)-\(title)" }
+
+    private enum CodingKeys: String, CodingKey {
+        case title, artist, album, date
+    }
+
+    /// SomaFM sends `date` as a string of Unix seconds, e.g. "1793568563".
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decode(String.self, forKey: .title)
+        artist = try container.decode(String.self, forKey: .artist)
+        album = try container.decodeIfPresent(String.self, forKey: .album) ?? ""
+        let seconds = Double(try container.decode(String.self, forKey: .date)) ?? 0
+        playedAt = Date(timeIntervalSince1970: seconds)
+    }
 }
 
 /// Shape of https://somafm.com/songs/defcon.json (only the fields we use).
