@@ -23,9 +23,13 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
 - `flow.fm/NowPlayingCenter.swift` — Lock Screen / Control Center / media keys via `MPNowPlayingInfoCenter`
   and `MPRemoteCommandCenter`. Artwork handler is `nonisolated` because the system calls it off-main.
 - `flow.fm/MyApp.swift` — owns the single `RadioPlayer` (so remote commands register once) and injects it
-  via `.environment`.
+  via `.environment`. Main `WindowGroup` has id `MyApp.mainWindowID`; on macOS also a `.window`-style
+  `MenuBarExtra` (icon switches between `radio` and `dot.radiowaves.left.and.right` while playing).
 - `flow.fm/ContentView.swift` — player UI in a `ScrollView`: logo, current track, play/stop, volume,
-  quality menu, and "Recently Played" (`RecentTracksView`, feed minus the on-air song).
+  quality menu, Support SomaFM link, and "Recently Played" (`RecentTracksView`, feed minus the on-air song).
+- `flow.fm/MenuBarPlayerView.swift` — macOS-only compact panel: logo, track, play/stop, volume, quality,
+  donate link, Open flow.fm, Quit.
+- `flow.fm/PlayerControls.swift` — shared `VolumeSlider`, `QualityPicker`, `SupportSomaFMLink`.
 - Default actor isolation is `MainActor`; Swift 5 mode with approachable concurrency.
 - macOS App Sandbox is on; `ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES` is required for streaming.
 - `UIBackgroundModes = [audio]` keeps the stream playing in the background on iPhone/iPad.
@@ -58,8 +62,8 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
 - Live stream: on play, create a fresh `AVPlayerItem` so playback starts at the live edge.
 
 ## SomaFM etiquette
-SomaFM is commercial-free and listener-supported. Keep API polling light (≥30 s) and plan
-to link to their donate page (https://somafm.com/support/).
+SomaFM is commercial-free and listener-supported. Keep API polling light (≥30 s). Both the main
+window and the menu bar panel link to their donate page (https://somafm.com/support/).
 
 ## Roadmap
 Done:
@@ -67,5 +71,6 @@ Done:
 - Background audio, Lock Screen / Control Center / media keys, interruption handling.
 - Mirror failover via `.pls`; app-only volume slider.
 - Quality picker (AAC 128/64/32, MP3 256/128) and Recently Played list.
+- Support SomaFM link; macOS menu bar player.
 
 Next candidates: none planned yet — ask the user.

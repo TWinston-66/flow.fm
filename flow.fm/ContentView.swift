@@ -4,8 +4,6 @@ struct ContentView: View {
     @Environment(RadioPlayer.self) private var radio
 
     var body: some View {
-        @Bindable var radio = radio
-
         ScrollView {
             VStack(spacing: 24) {
                 AsyncImage(url: RadioPlayer.logoURL) { image in
@@ -46,23 +44,14 @@ struct ContentView: View {
                 .buttonBorderShape(.circle)
                 .accessibilityLabel(radio.isPlaying ? "Stop" : "Play")
 
-                // Controls only this app's volume; the system output volume is untouched.
-                HStack(spacing: 12) {
-                    Image(systemName: "speaker.fill")
-                    Slider(value: $radio.volume, in: 0...1)
-                        .accessibilityLabel("Volume")
-                    Image(systemName: "speaker.wave.3.fill")
-                }
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 280)
+                VolumeSlider()
+                    .frame(maxWidth: 280)
 
-                Picker("Quality", selection: $radio.quality) {
-                    ForEach(StreamQuality.allCases) { quality in
-                        Text(quality.label).tag(quality)
-                    }
+                VStack(spacing: 12) {
+                    QualityPicker()
+                    SupportSomaFMLink()
+                        .font(.subheadline)
                 }
-                .pickerStyle(.menu)
-                .fixedSize()
 
                 RecentTracksView(tracks: Array(radio.recentTracks.dropFirst()))
                     .frame(maxWidth: 480)
