@@ -11,10 +11,16 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
   against `RadioPlayer.swift` to exercise playback logic.
 
 ## Code layout
-- `flow.fm/RadioPlayer.swift` — `@Observable` model wrapping `AVPlayer`; plays the stream and polls now-playing.
+- `flow.fm/RadioPlayer.swift` — `@Observable` model wrapping `AVPlayer`; plays the stream, polls now-playing,
+  handles audio session interruptions (iOS 27 `didBecomeInactive` / `resumptionRecommendation` notifications).
+- `flow.fm/NowPlayingCenter.swift` — Lock Screen / Control Center / media keys via `MPNowPlayingInfoCenter`
+  and `MPRemoteCommandCenter`. Artwork handler is `nonisolated` because the system calls it off-main.
+- `flow.fm/MyApp.swift` — owns the single `RadioPlayer` (so remote commands register once) and injects it
+  via `.environment`.
 - `flow.fm/ContentView.swift` — player UI (logo, title, current track, play/stop).
 - Default actor isolation is `MainActor`; Swift 5 mode with approachable concurrency.
 - macOS App Sandbox is on; `ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES` is required for streaming.
+- `UIBackgroundModes = [audio]` keeps the stream playing in the background on iPhone/iPad.
 
 ## How the DEF CON stream works
 - Icecast 2.4 HTTP stream (not HLS): one long-lived GET returning continuous audio.
@@ -45,10 +51,11 @@ SomaFM is commercial-free and listener-supported. Keep API polling light (≥30 
 to link to their donate page (https://somafm.com/support/).
 
 ## Roadmap
-Done: minimal player (play/stop, logo, now playing).
+Done:
+- Minimal player (play/stop, logo, now playing).
+- Background audio, Lock Screen / Control Center / media keys, interruption handling.
+
 Next candidates:
-1. Background audio (`UIBackgroundModes: audio`) + lock screen / Control Center
-   (`MPNowPlayingInfoCenter`, `MPRemoteCommandCenter`).
-2. Resolve `.pls` and fail over between mirrors.
-3. Quality picker (AAC 128/64/32, MP3 256/128).
-4. Song history list from `songs/defcon.json`.
+1. Resolve `.pls` and fail over between mirrors.
+2. Quality picker (AAC 128/64/32, MP3 256/128).
+3. Song history list from `songs/defcon.json`.

@@ -11,6 +11,7 @@
     ],
   },
   "files": [
+    { "path": "flow-fm-Info.plist" },
     { "kind": "folder", "path": "flow.fm", "target-membership": [ "flow.fm" ] },
     {
       "kind": "group",
@@ -39,6 +40,7 @@
         "ENABLE_PREVIEWS": "YES",
         "ENABLE_USER_SELECTED_FILES": "readonly",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "flow-fm-Info.plist",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]": "YES",
         "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]": "YES",

@@ -1,13 +1,11 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var radio = RadioPlayer()
-
-    private let logoURL = URL(string: "https://api.somafm.com/logos/512/defcon512.png")
+    @Environment(RadioPlayer.self) private var radio
 
     var body: some View {
         VStack(spacing: 24) {
-            AsyncImage(url: logoURL) { image in
+            AsyncImage(url: RadioPlayer.logoURL) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 16)
@@ -49,4 +47,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(RadioPlayer())
 }
