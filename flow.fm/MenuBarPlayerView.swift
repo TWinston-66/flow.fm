@@ -56,6 +56,8 @@ struct MenuBarPlayerView: View {
 
             HStack {
                 Button("Open flow.fm") {
+                    // Restore the Dock icon first so the window comes forward as a regular app.
+                    NSApplication.shared.setActivationPolicy(.regular)
                     openWindow(id: MyApp.mainWindowID)
                     NSApplication.shared.activate()
                 }

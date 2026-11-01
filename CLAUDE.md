@@ -23,8 +23,10 @@ Single multiplatform target `flow.fm`: iPhone, iPad and Mac (deployment target 2
 - `flow.fm/NowPlayingCenter.swift` — Lock Screen / Control Center / media keys via `MPNowPlayingInfoCenter`
   and `MPRemoteCommandCenter`. Artwork handler is `nonisolated` because the system calls it off-main.
 - `flow.fm/MyApp.swift` — owns the single `RadioPlayer` (so remote commands register once) and injects it
-  via `.environment`. Main `WindowGroup` has id `MyApp.mainWindowID`; on macOS also a `.window`-style
-  `MenuBarExtra` (icon switches between `radio` and `dot.radiowaves.left.and.right` while playing).
+  via `.environment`. macOS uses a single `Window` (id `MyApp.mainWindowID`, default 420×760, min 360×480)
+  plus a `.window`-style `MenuBarExtra` (icon switches between `radio` and `dot.radiowaves.left.and.right`
+  while playing); iOS uses a `WindowGroup`. On macOS, closing the window switches the activation policy to
+  `.accessory` (no Dock icon, stays in the menu bar); reopening switches back to `.regular`.
 - `flow.fm/ContentView.swift` — player UI in a `ScrollView`: logo, current track, play/stop, volume,
   quality menu, Support SomaFM link, and "Recently Played" (`RecentTracksView`, feed minus the on-air song).
 - `flow.fm/MenuBarPlayerView.swift` — macOS-only compact panel: logo, track, play/stop, volume, quality,
@@ -72,5 +74,6 @@ Done:
 - Mirror failover via `.pls`; app-only volume slider.
 - Quality picker (AAC 128/64/32, MP3 256/128) and Recently Played list.
 - Support SomaFM link; macOS menu bar player.
+- macOS portrait default window size; Dock icon hides when the window is closed.
 
 Next candidates: none planned yet — ask the user.
